@@ -1,0 +1,149 @@
+Screen {
+    align: center middle;
+}
+
+Header {
+    height: 1;
+    dock: top;
+}
+
+Footer {
+    height: 1;
+    dock: bottom;
+}
+
+.border {
+    border: solid $background;
+    padding: 0;
+}
+
+.border-no-top {
+    border: solid $background;
+    border-top: none;
+}
+
+.border-no-bottom {
+    border: solid $background;
+    padding: 0;
+    border-bottom: none;
+}
+
+.welcome {
+    width: auto;
+    border-top: none;
+    border-bottom: none;
+}
+
+.info-machine {
+    layout: grid;
+    grid-size: 4;
+    align: center middle;
+}
+
+BoxLabel {
+    border: tall $secondary;
+    content-align: center middle;
+    opacity: 100%;
+    border-title-color: white;
+}
+
+.info-flags-container {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 2fr;
+    align: center middle;
+}
+
+.flags-container {
+    layout: grid;
+    grid-size: 3;
+    height: auto;
+    align: center middle;
+    border: tall $secondary;
+}
+
+FlagStatus {
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    opacity: 100%;
+    border: none;
+    background: $background;
+    & > .toggle--button {
+        color: $text-error;
+        background: $background;
+    }
+    &.-on > .toggle--button {
+        color: $text-success;
+        background: $background;
+    }
+}
+
+.unknown-container-button > .toggle--button {
+    color: $text-warning;
+    background: $background;
+}
+
+.unknown-container {
+    color: $text-warning;
+}
+
+.machine-buttons-container {
+    layout: horizontal;
+    align: center middle;
+}
+
+.invisible {
+    display: none;
+}
+
+.action-button {
+    margin: 0 1;
+}
+
+.download {
+    width: 6;
+    min-width: 0;
+}
+
+.disabled {
+    opacity: 0.6;
+}
+
+.search-container {
+    height: auto;
+}
+
+#filters-button {
+    dock: right;
+}
+
+.modal {
+    height: 92%;
+    width: 92%;
+    background: $surface 40%;
+ }
+
+.filters-type-container {
+    layout: grid;
+    grid-size: 3;
+    grid-gutter: 0 0;
+}
+
+.filter-status-container {
+    overflow-y: auto;
+}
+
+.filter-availability-container {
+    overflow-y: auto;
+    height: 50%;
+}
+
+.filters-button-container {
+    layout: horizontal;
+}
+
+.filter-select {
+    height: 100%;
+    margin-bottom: 1;
+}
