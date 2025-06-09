@@ -22,26 +22,24 @@ async def query_user_info(client):
 async def query_current_box(client):
     res = await client.get(f"{API}/machine/active")
     data = res.json()["info"]
+    out = {"current_box": None}
     if data is not None:
-        return await query_box_info(client, data["name"])
-    else:
-        return {"current_box": None}
+        info = await query_box_info(client, data["name"])
+        out["current_box"] = {
+            "name": data["name"],
+            "id": info["id"],
+            "difficulty": info["difficultyText"],
+            "os": info["os"],
+            "user_own": info["authUserInUserOwns"],
+            "root_own": info["authUserInRootOwns"],
+            "ip": info["ip"],
+        }
+    return out
 
 
 async def query_box_info(client, name):
     res = await client.get(f"{API}/machine/profile/{name}")
-    data = res.json()["info"]
-    return {
-        "current_box": {
-            "name": name,
-            "id": data["id"],
-            "difficulty": data["difficultyText"],
-            "os": data["os"],
-            "user_own": data["authUserInUserOwns"],
-            "root_own": data["authUserInRootOwns"],
-            "ip": data["ip"],
-        }
-    }
+    return res.json()["info"]
 
 
 async def query_vpn_servers(client):
@@ -100,6 +98,33 @@ async def query_retired_boxes(client):
     return total
 
 
+async def query_retired_free_boxes(client):
+    res = await client.get(
+        f"{API}/machine/list/retired/paginated",
+        params={"per_page": 100, "free": 1},
+    )
+    data = res.json()
+    return data["data"]
+
+
+async def query_new_boxes(client, db):
+    active_res = await query_active_boxes(client)
+    data = {"active": active_res}
+    parsed_active = db._machine_parse(data, "active")
+    server_active = {d for d, *_ in parsed_active}
+    local_active = set(db.machines_by_active())
+    new = server_active - local_active
+    if new:
+        db.machine_add(data)
+        free_res = await query_retired_free_boxes(client)
+        data["retired"] = free_res
+        parsed_free = db._machine_parse(data, "retired")
+        server_retired = {d for d, *_ in parsed_free}
+        db.machines_reset_free_active()
+        db.machines_update_active(server_active)
+        db.machines_update_retired(server_retired)
+
+
 async def query_tags(client, missing):
     total_tags = []
     total_relations = []
@@ -113,27 +138,49 @@ async def query_tags(client, missing):
     return total_tags, total_relations
 
 
-# async def switch_vpn(vpn: int) -> None:
-#     res = CLIENT.post(f"{API}/connections/servers/switch/{vpn}")
+async def machine_action(client, action, machine_id):
+    # import time
+
+    # start = time.time()
+    match action:
+        case "start":
+            res = await client.post(
+                f"{API}/vm/spawn", json={"machine_id": machine_id}
+            )
+        case "stop":
+            res = await client.post(
+                f"{API}/vm/terminate", json={"machine_id": machine_id}
+            )
+        case "reset":
+            res = await client.post(
+                f"{API}/vm/reset", json={"machine_id": machine_id}
+            )
+    # with open("/tmp/htbpanel.fifo", "w") as f:
+    #     f.write(f"action {action} elapsed: {time.time() - start} | `{res.json()}`\n")
+    #     f.flush()
+    out = res.json()
+    if isinstance(out["success"], str):
+        out["success"] = bool(int(out["success"]))
+    return out
+
+
+async def submit_flag(client, machine_id, flag):
+    # import time
+
+    # start = time.time()
+    res = await client.post(
+        f"{API}/machine/own", json={"id": machine_id, "flag": flag}
+    )
+    # with open("/tmp/htbpanel.fifo", "w") as f:
+    #     f.write(f"flag elapsed: {time.time() - start} | `{res.json()}`\n")
+    #     f.flush()
+    return res.json()
+
+
+# async def switch_vpn(client, vpn):
+#     res = await client.post(f"{API}/connections/servers/switch/{vpn}")
 #     if res.status_code == 200:
-#         ovpn = CLIENT.get(f"{API}/access/ovpnfile/{vpn}/0")
+#         ovpn = await client.get(f"{API}/access/ovpnfile/{vpn}/0")
 #         if ovpn.status_code == 200:
 #             with open(f"lab_{INFO['user']['name']}.ovpn", "w") as f:
 #                 f.write(ovpn.text)
-
-
-# def machine_action(machine: int, action: str) -> bool:
-#     if action == "spawn":
-#         res = CLIENT.post(f"{API}/machine/play/{machine}")
-#     elif action == "stop":
-#         res = CLIENT.post(f"{API}/machine/stop")
-#     else:
-#         res = CLIENT.post(f"{API}/vm/reset", json={"machine_id": machine})
-#     return res.status_code == 200
-
-
-# def submit_flag(flag: str) -> bool:
-#     res = CLIENT.post(
-#         f"{API}/machine/own", json={"id": INFO["mach"]["id"], "flag": flag}
-#     )
-#     return res.status_code == 200

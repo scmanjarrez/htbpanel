@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 
@@ -16,8 +17,21 @@ def headers(token):
 
 
 async def main():
+    parser = argparse.ArgumentParser(prog="python -m htbpanel")
+    parser.add_argument(
+        "-t", "--update-tags", action="store_true", help="Update missing tags"
+    )
+    parser.add_argument(
+        "-m",
+        "--update-machines",
+        action="store_true",
+        help="Update missing machines",
+    )
+    args = parser.parse_args()
+
     client = httpx.AsyncClient(headers=headers(TOKEN), timeout=30)
     db = Database()
+
     if not db.vpn_count():
         db.vpn_add(await api.query_vpn_servers(client))
 
@@ -28,9 +42,12 @@ async def main():
     info.update(await api.query_current_box(client))
     info.update(await api.query_current_vpn(client))
 
+    if args.update_machines:
+        await api.query_new_boxes(client, db)
 
-    # missing = db.machines_by_notag()
-    # db.add_tags_info(await api.query_tags(client, missing))
+    if args.update_tags:
+        missing = db.machines_by_notag()
+        db.add_tags_info(await api.query_tags(client, missing))
 
     app = tui.HTBPanel(client, db, info)
     await app.run_async()

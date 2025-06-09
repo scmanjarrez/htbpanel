@@ -44,10 +44,6 @@ class Database:
             """
         )
 
-    def machines(self):
-        self.cursor.execute("SELECT name, difficulty, os, free FROM machines")
-        return self.cursor.fetchall()
-
     def machines_with_tags(self):
         self.cursor.execute(
             "SELECT machines.name, machines.difficulty, "
@@ -68,47 +64,56 @@ class Database:
         self.cursor.execute("SELECT COUNT(*) FROM machines")
         return self.cursor.fetchone()[0]
 
-    def machine_add(self, data):
-        def generator(machine_type):
-            return [
-                (
-                    machine["id"],
-                    machine["name"],
-                    machine["difficultyText"],
-                    machine["os"],
-                    int(machine["free"]),
-                    int(machine_type == "active"),
-                    int(machine["authUserInUserOwns"]),
-                    int(machine["authUserInRootOwns"]),
-                )
-                for machine in data[machine_type]
-            ]
+    def _machine_parse(self, data, machine_type):
+        return [
+            (
+                machine["id"],
+                machine["name"],
+                machine["difficultyText"],
+                machine["os"],
+                int(machine["free"]),
+                int(machine_type == "active"),
+                int(machine["authUserInUserOwns"]),
+                int(machine["authUserInRootOwns"]),
+            )
+            for machine in data[machine_type]
+        ]
 
-        insert = generator("retired")
-        insert.extend(generator("active"))
+    def machine_add(self, data):
+        insert = self._machine_parse(data, "active")
+        if "retired" in data:
+            insert.extend(self._machine_parse(data, "retired"))
         self.cursor.executemany(
             "INSERT OR IGNORE INTO machines "
-            "(id, name, difficulty, os, free, active) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(id, name, difficulty, os, free, active, user_own, root_own) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             insert,
         )
         self.conn.commit()
 
-    def machines_by_difficulty(self, difficulty):
-        self.cursor.execute(
-            "SELECT name, difficulty, os, free "
-            "FROM machines "
-            "WHERE difficulty = ?",
-            difficulty,
-        )
-        return self.cursor.fetchall()
+    def machine_by_id(self, id):
+        self.cursor.execute("SELECT name FROM machines WHERE id = ?", [id])
+        return self.cursor.fetchone()[0]
 
-    def machines_by_os(self, os):
+    def machines_reset_free_active(self):
+        self.cursor.execute("UPDATE machines SET free = 0, active = 0 ")
+        self.conn.commit()
+
+    def machines_update_active(self, ids):
         self.cursor.execute(
-            "SELECT name, difficulty, os, free FROM machines WHERE os = ?",
-            os,
+            f"UPDATE machines SET free = 1, active = 1 "
+            f"WHERE id IN ({','.join('?' for _ in ids)})",
+            list(ids),
         )
-        return self.cursor.fetchall()
+        self.conn.commit()
+
+    def machines_update_free(self, ids):
+        self.cursor.execute(
+            f"UPDATE machines SET free = 1 "
+            f"WHERE id IN ({','.join('?' for _ in ids)})",
+            list(ids),
+        )
+        self.conn.commit()
 
     def machines_os_list(self):
         self.cursor.execute(
@@ -116,57 +121,11 @@ class Database:
         )
         return [(d, idx) for idx, (d,) in enumerate(self.cursor.fetchall())]
 
-    def machines_by_free(self):
-        self.cursor.execute(
-            "SELECT name, difficulty, os, free FROM machines WHERE free = 1",
-        )
-        return self.cursor.fetchall()
-
     def machines_by_active(self):
         self.cursor.execute(
-            "SELECT name, difficulty, os, free FROM machines WHERE active = 1",
+            "SELECT id FROM machines WHERE active = 1",
         )
-        return self.cursor.fetchall()
-
-    def machines_by_completed(self):
-        self.cursor.execute(
-            "SELECT name, difficulty, os, free "
-            "FROM machines "
-            "WHERE user_own = 1 AND root_own = 1",
-        )
-        return self.cursor.fetchall()
-
-    def machines_by_incompleted(self):
-        self.cursor.execute(
-            "SELECT name, difficulty, os, free "
-            "FROM machines "
-            "WHERE user_own = 0 AND root_own = 0",
-        )
-        return self.cursor.fetchall()
-
-    def machines_by_tag(self, tag):
-        self.cursor.execute(
-            "SELECT machines.name, machines.difficulty, machines.os, machines.free "
-            "FROM machines "
-            "LEFT JOIN machine_tag "
-            "ON machines.id = machine_tag.machine_id "
-            "LEFT JOIN tags "
-            "ON tags.id = machine_tag.tag_id "
-            "WHERE tags.name = ?",
-            tag,
-        )
-        return self.cursor.fetchall()
-
-    def machines_by_notag(self):
-        self.cursor.execute(
-            "SELECT machines.id "
-            "FROM machines "
-            "LEFT JOIN machine_tag "
-            "ON machines.id = machine_tag.machine_id "
-            "WHERE machines.active = 0 "
-            "AND machine_tag.tag_id IS NULL"
-        )
-        return [mach for (mach,) in self.cursor.fetchall()]
+        return [d for (d,) in self.cursor.fetchall()]
 
     def machines_by_vip(self, vip):
         if vip:
@@ -221,6 +180,35 @@ class Database:
             f"GROUP BY machines.id, machines.name "
             f"ORDER BY machines.free DESC",
             params,
+        )
+        return [
+            (n, d, o, "✓" if f else "x", t)
+            for (n, d, o, f, t) in self.cursor.fetchall()
+        ]
+
+    def machines_by_notag(self):
+        self.cursor.execute(
+            "SELECT machines.id "
+            "FROM machines "
+            "LEFT JOIN machine_tag "
+            "ON machines.id = machine_tag.machine_id "
+            "WHERE machines.active = 0 "
+            "AND machine_tag.tag_id IS NULL"
+        )
+        return [mach for (mach,) in self.cursor.fetchall()]
+
+    def machines_by_name(self, name):
+        self.cursor.execute(
+            "SELECT machines.name, machines.difficulty, "
+            "machines.os, machines.free, "
+            "GROUP_CONCAT(tags.name, ',') AS tags "
+            "FROM machines "
+            "LEFT JOIN machine_tag ON machines.id = machine_tag.machine_id "
+            "LEFT JOIN tags ON machine_tag.tag_id = tags.id "
+            "WHERE machines.name LIKE ?"
+            "GROUP BY machines.id, machines.name "
+            "ORDER BY machines.free DESC",
+            [f"%{name}%"],
         )
         return [
             (n, d, o, "✓" if f else "x", t)

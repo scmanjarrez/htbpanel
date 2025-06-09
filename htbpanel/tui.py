@@ -1,13 +1,9 @@
-import json
 import subprocess
 
-from textual.app import App, ComposeResult, SystemCommand
+from textual.app import App
 from textual.containers import (
     Center,
     Container,
-    Horizontal,
-    Vertical,
-    VerticalScroll,
 )
 from textual.reactive import reactive
 from textual.screen import ModalScreen
@@ -242,7 +238,6 @@ class HTBPanel(App):
         self.db = db
         self.info = info
         self.mounted = False
-        self.cnt = 0
         self.prepare_data()
 
     def prepare_data(self):
@@ -281,6 +276,7 @@ class HTBPanel(App):
                         value=self.machine_types[0][1]
                         if not ACTIVE
                         else ACTIVE["id"],
+                        disabled=bool(ACTIVE),
                         id="machine",
                         allow_blank=False,
                     )
@@ -332,11 +328,19 @@ class HTBPanel(App):
     def key_ctrl_c(self):
         self.app.exit()
 
-    def on_button_pressed(self, event):
+    async def on_button_pressed(self, event):
         if event.button.id == "filters-button":
             self.push_screen("filters", self.on_filters_accept)
-        elif event.button.id in ["cancel", "accept"]:
-            self.pop_screen()
+        elif event.button.id in ["start", "stop", "reset"]:
+            machine_select = self.query_one("#machine")
+            res = await api.machine_action(
+                self.client, event.button.id, machine_select.value
+            )
+            if res["success"]:
+                self.notify(res["message"])
+                await self.action_reload()
+            else:
+                self.notify(res["message"], severity="error")
 
     def check_action(self, action, _) -> bool:
         if isinstance(self.app.focused, FlagInput) or isinstance(
@@ -391,6 +395,23 @@ class HTBPanel(App):
                 )
                 xclip.communicate(event.widget.renderable.encode())
 
+    async def on_input_submitted(self, event):
+        if event.input.id == "flag":
+            machine_select = self.query_one("#machine")
+            await api.submit_flag(
+                self.client, machine_select.value, event.value
+            )
+            # TODO
+
+    async def on_input_changed(self, event):
+        if event.input.id == "search":
+            await self._debounced_search(event.value)
+
+    async def _debounced_search(self, query):
+        table = self.query_one(DataTable)
+        table.clear()
+        table.add_rows(self.db.machines_by_name(query))
+
     def key_escape(self):
         if isinstance(self.app.screen, FilterScreen):
             self.pop_screen()
@@ -399,7 +420,6 @@ class HTBPanel(App):
 
     def on_filters_accept(self, data):
         if data:
-            # self.notify(json.dumps(list(data.keys())))
             table = self.query_one(DataTable)
             table.clear()
             table.add_rows(self.db.machines_by_filters(data))
@@ -407,18 +427,14 @@ class HTBPanel(App):
     async def action_reload(self):
         self.info.update(await api.query_current_box(self.client))
         self.info.update(await api.query_current_vpn(self.client))
-        self.cnt += 1
         self.update_active()
 
     def update_active(self):
         active = self.info["current_box"] is not None
-        if self.cnt == 1:
-            active = False
         if active:
             ACTIVE.update(self.info["current_box"])
         else:
             ACTIVE.clear()
-        # self.notify(f"status: {active}")
         if self.mounted and active:
             # Show stop
             stop_btn = self.query_one("#stop")
@@ -442,9 +458,10 @@ class HTBPanel(App):
                 box_label = self.query_one(f"#{box_type}")
                 box_label.remove_class("unknown-container")
                 box_label.update(ACTIVE[box_type])
-            # Set machine select to current box
+            # Set machine select to current box and disable
             machine_sel = self.query_one("#machine")
             machine_sel.value = ACTIVE["id"]
+            machine_sel.disabled = True
         elif self.mounted and not active:
             # Hide stop
             stop_btn = self.query_one("#stop")
@@ -468,3 +485,6 @@ class HTBPanel(App):
                 box_label = self.query_one(f"#{box_type}")
                 box_label.add_class("unknown-container")
                 box_label.update("?")
+            # Eanble machine select
+            machine_sel = self.query_one("#machine")
+            machine_sel.disabled = False
