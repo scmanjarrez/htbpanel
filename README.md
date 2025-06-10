@@ -55,22 +55,16 @@ From there, you can browse, manage, and interact with HTB machines right in your
 
 Have an idea or improvement? Feel free to open issues or submit pull requests! This is a learning-focused project and contributions are always welcome.
 
+---
 
-## Screenshots
+## 📸 Screenshots
 
-<div align="center">
-    <h3>Active tab</h3>
-    <img src="images/active_tab.png" width="75%">
-</div>
+### 🔛 Active Tab
 
+<img src="images/active_tab.png" width="65%">
 
-<div align="center">
-    <h3>Machines tab</h3>
-    <img src="images/machines_tab.png" width="75%">
-</div>
+### 🖥️ Machines Tab
+<img src="images/machines_tab.png" width="65%">
 
-
-<div align="center">
-    <h3>Filters screen</h3>
-    <img src="images/filters_screen.png" width="75%">
-</div>
+### 🧩 Filters Screen
+<img src="images/filters_screen.png" width="65%">
