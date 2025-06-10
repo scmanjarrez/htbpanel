@@ -139,9 +139,6 @@ async def query_tags(client, missing):
 
 
 async def machine_action(client, action, machine_id):
-    # import time
-
-    # start = time.time()
     match action:
         case "start":
             res = await client.post(
@@ -155,9 +152,6 @@ async def machine_action(client, action, machine_id):
             res = await client.post(
                 f"{API}/vm/reset", json={"machine_id": machine_id}
             )
-    # with open("/tmp/htbpanel.fifo", "w") as f:
-    #     f.write(f"action {action} elapsed: {time.time() - start} | `{res.json()}`\n")
-    #     f.flush()
     out = res.json()
     if isinstance(out["success"], str):
         out["success"] = bool(int(out["success"]))
@@ -165,15 +159,9 @@ async def machine_action(client, action, machine_id):
 
 
 async def submit_flag(client, machine_id, flag):
-    # import time
-
-    # start = time.time()
     res = await client.post(
         f"{API}/machine/own", json={"id": machine_id, "flag": flag}
     )
-    # with open("/tmp/htbpanel.fifo", "w") as f:
-    #     f.write(f"flag elapsed: {time.time() - start} | `{res.json()}`\n")
-    #     f.flush()
     return res.json()
 
 

@@ -53,7 +53,7 @@ class Database:
             "LEFT JOIN machine_tag ON machines.id = machine_tag.machine_id "
             "LEFT JOIN tags ON machine_tag.tag_id = tags.id "
             "GROUP BY machines.id, machines.name "
-            "ORDER BY machines.free DESC"
+            "ORDER BY machines.free DESC, machines.name"
         )
         return [
             (n, d, o, "✓" if f else "x", t)
@@ -88,6 +88,13 @@ class Database:
             "(id, name, difficulty, os, free, active, user_own, root_own) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             insert,
+        )
+        self.conn.commit()
+
+    def machine_own(self, id, own_type):
+        self.cursor.execute(
+            f"UPDATE machines SET {own_type} = 1 WHERE id = ?",
+            [id],
         )
         self.conn.commit()
 
@@ -129,10 +136,10 @@ class Database:
 
     def machines_by_vip(self, vip):
         if vip:
-            self.cursor.execute("SELECT name, id FROM machines")
+            self.cursor.execute("SELECT name, id FROM machines ORDER BY name")
         else:
             self.cursor.execute(
-                "SELECT name, id FROM machines WHERE free = 1",
+                "SELECT name, id FROM machines WHERE free = 1 ORDER BY name",
             )
         return self.cursor.fetchall()
 
@@ -178,7 +185,7 @@ class Database:
             f"LEFT JOIN tags ON machine_tag.tag_id = tags.id "
             f"{condition}"
             f"GROUP BY machines.id, machines.name "
-            f"ORDER BY machines.free DESC",
+            f"ORDER BY machines.free DESC, machines.name",
             params,
         )
         return [
@@ -207,7 +214,7 @@ class Database:
             "LEFT JOIN tags ON machine_tag.tag_id = tags.id "
             "WHERE machines.name LIKE ?"
             "GROUP BY machines.id, machines.name "
-            "ORDER BY machines.free DESC",
+            "ORDER BY machines.free DESC, machines.name",
             [f"%{name}%"],
         )
         return [
@@ -259,18 +266,27 @@ class Database:
 
     def tags_category_list(self):
         self.cursor.execute(
-            "SELECT name, id FROM tags WHERE category = 'Category'"
+            "SELECT name, id "
+            "FROM tags "
+            "WHERE category = 'Category' "
+            "ORDER BY name"
         )
         return self.cursor.fetchall()
 
     def tags_area_list(self):
         self.cursor.execute(
-            "SELECT name, id FROM tags WHERE category = 'Area of Interest'"
+            "SELECT name, id "
+            "FROM tags "
+            "WHERE category = 'Area of Interest' "
+            "ORDER BY name"
         )
         return self.cursor.fetchall()
 
     def tags_vulnerability_list(self):
         self.cursor.execute(
-            "SELECT name, id FROM tags WHERE category = 'Vulnerabilities'"
+            "SELECT name, id "
+            "FROM tags "
+            "WHERE category = 'Vulnerabilities' "
+            "ORDER BY name"
         )
         return self.cursor.fetchall()

@@ -398,10 +398,16 @@ class HTBPanel(App):
     async def on_input_submitted(self, event):
         if event.input.id == "flag":
             machine_select = self.query_one("#machine")
-            await api.submit_flag(
+            data = await api.submit_flag(
                 self.client, machine_select.value, event.value
             )
-            # TODO
+            if "Incorrect" in data["message"]:
+                self.notify(data["message"], severity="error")
+            else:
+                self.notify(data["message"])
+                self.db.machine_own(data["own_type"])
+                flag_btn = self.query_one(f"#{data['own_type']}")
+                flag_btn.toggle()
 
     async def on_input_changed(self, event):
         if event.input.id == "search":
