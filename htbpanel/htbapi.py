@@ -122,7 +122,7 @@ async def query_new_boxes(client, db):
         server_retired = {d for d, *_ in parsed_free}
         db.machines_reset_free_active()
         db.machines_update_active(server_active)
-        db.machines_update_retired(server_retired)
+        db.machines_update_free(server_retired)
 
 
 async def query_tags(client, missing):
