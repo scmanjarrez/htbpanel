@@ -19,23 +19,35 @@ def headers(token):
 async def main():
     parser = argparse.ArgumentParser(prog="python -m htbpanel")
     parser.add_argument(
-        "-t", "--update-tags", action="store_true", help="Update missing tags"
+        "-ut", "--update-tags", action="store_true", help="Update missing tags"
     )
     parser.add_argument(
-        "-m",
+        "-um",
         "--update-machines",
         action="store_true",
         help="Update missing machines",
+    )
+    parser.add_argument(
+        "-ur",
+        "--update-retired",
+        action="store_true",
+        help="Update retired machines",
+    )
+    parser.add_argument(
+        "-uv",
+        "--update-vpns",
+        action="store_true",
+        help="Update missing vpns",
     )
     args = parser.parse_args()
 
     client = httpx.AsyncClient(headers=headers(TOKEN), timeout=30)
     db = Database()
 
-    if not db.vpn_count():
+    if args.update_vpns or not db.vpn_count():
         db.vpn_add(await api.query_vpn_servers(client))
 
-    if not db.machine_count():
+    if args.update_retired or not db.machine_count():
         db.machine_add(await api.query_boxes(client))
 
     info = await api.query_user_info(client)

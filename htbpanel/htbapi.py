@@ -50,18 +50,18 @@ async def query_vpn_servers(client):
 
 
 async def query_current_vpn(client):
-    data_all = await query_vpn_servers(client)
     res = await client.get(f"{API}/connection/status")
     data = res.json()
-    out = {
-        "current_vpn": {
-            "name": data_all["assigned"]["friendly_name"],
-            "id": data_all["assigned"]["id"],
-        }
-    }
+    out = {"current_vpn": {}}
     if data:
+        out["current_vpn"]["name"] = f"{data[0]['server']['friendly_name']}"
+        out["current_vpn"]["id"] = int(data[0]["server"]["id"])
         out["current_vpn"]["address"] = f"{data[0]['server']['hostname']}:1337"
         out["current_vpn"]["ip"] = data[0]["connection"]["ip4"]
+    else:
+        data = await query_vpn_servers(client)
+        out["current_vpn"]["name"] = data["assigned"]["friendly_name"]
+        out["current_vpn"]["id"] = int(data["assigned"]["id"])
     return out
 
 
@@ -152,10 +152,7 @@ async def machine_action(client, action, machine_id):
             res = await client.post(
                 f"{API}/vm/reset", json={"machine_id": machine_id}
             )
-    out = res.json()
-    if isinstance(out["success"], str):
-        out["success"] = bool(int(out["success"]))
-    return out
+    return res.status_code == 200, res.json()["message"]
 
 
 async def submit_flag(client, machine_id, flag):
@@ -165,10 +162,16 @@ async def submit_flag(client, machine_id, flag):
     return res.json()
 
 
-# async def switch_vpn(client, vpn):
-#     res = await client.post(f"{API}/connections/servers/switch/{vpn}")
-#     if res.status_code == 200:
-#         ovpn = await client.get(f"{API}/access/ovpnfile/{vpn}/0")
-#         if ovpn.status_code == 200:
-#             with open(f"lab_{INFO['user']['name']}.ovpn", "w") as f:
-#                 f.write(ovpn.text)
+async def switch_vpn(client, info, vpn_id):
+    if info["current_vpn"]["id"] != vpn_id:
+        await client.post(f"{API}/connections/servers/switch/{vpn_id}")
+        return True
+    return False
+
+
+async def download_vpn(client, info, vpn_id):
+    data = await client.get(f"{API}/access/ovpnfile/{vpn_id}/0")
+    file = f"htbpanel_{info['user']['name']}.ovpn"
+    with open(file, "wb") as f:
+        f.write(data.content)
+    return file

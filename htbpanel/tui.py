@@ -4,6 +4,7 @@ from textual.app import App
 from textual.containers import (
     Center,
     Container,
+    Horizontal,
 )
 from textual.reactive import reactive
 from textual.screen import ModalScreen
@@ -26,17 +27,22 @@ from textual.widgets.tabbed_content import ContentTabs
 import htbpanel.htbapi as api
 
 ACTIVE = {}
+ACTIVE_VPN = {}
 
 
-class BoxLabel(Static):
-    def __init__(self, title, subtitle=""):
+class Label(Static):
+    def __init__(self, title, subtitle="", vpn=False):
         self.BORDER_TITLE = title
         self.BORDER_SUBTITLE = subtitle
-        classes = "" if ACTIVE else "unknown-container"
+        data = ACTIVE
+        if vpn:
+            data = ACTIVE_VPN
+        active = title.lower() in data
+        classes = "" if active else "unknown-container"
         super().__init__(
-            content=ACTIVE[title.lower()] if ACTIVE else "?",
+            content=data[title.lower()] if active else "?",
             classes=classes,
-            id=title.lower(),
+            id=title.lower() if not vpn else f"{title.lower()}_vpn",
         )
 
 
@@ -64,7 +70,7 @@ class FlagStatus(ToggleButton):
 
 
 class FlagInput(Input):
-    def __init__(self, name: str):
+    def __init__(self, name):
         super().__init__(
             placeholder=name.capitalize(),
             id=name,
@@ -74,8 +80,8 @@ class FlagInput(Input):
         )
 
 
-class BoxAction(Button):
-    def __init__(self, name: str):
+class ButtonAction(Button):
+    def __init__(self, name):
         icon = "⏵"
         variant = "success"
         classes = "action-button"
@@ -93,7 +99,11 @@ class BoxAction(Button):
                 disabled = not ACTIVE
             case "download":
                 icon = "⤓"
-                classes = f"{classes} download"
+                classes = f"{classes} vpn-action"
+            case "switch":
+                icon = "⇄"
+                classes = f"{classes} vpn-action"
+                variant = "primary"
         super().__init__(
             icon,
             id=name,
@@ -115,7 +125,7 @@ class FilterScreen(ModalScreen):
                 with Container():
                     with Container(classes="filter-status-container"):
                         with Center():
-                            yield Static("Status", classes="welcome")
+                            yield Static("Status", classes="static-text")
                         yield RadioSet(
                             *[
                                 self.CrossRadioButton(k, value=v)
@@ -125,7 +135,7 @@ class FilterScreen(ModalScreen):
                         )
                     with Container(classes="filter-availability-container"):
                         with Center():
-                            yield Static("Availability", classes="welcome")
+                            yield Static("Availability", classes="static-text")
                         yield SelectionList(
                             *self.availability_types,
                             classes="filter-availability",
@@ -133,7 +143,7 @@ class FilterScreen(ModalScreen):
                         )
                 with Container():
                     with Center():
-                        yield Static("Difficulty", classes="welcome")
+                        yield Static("Difficulty", classes="static-text")
                     yield SelectionList(
                         *self.difficulty_types,
                         classes="filter-select",
@@ -141,13 +151,13 @@ class FilterScreen(ModalScreen):
                     )
                 with Container():
                     with Center():
-                        yield Static("OS", classes="welcome")
+                        yield Static("OS", classes="static-text")
                     yield SelectionList(
                         *self.os_types, classes="filter-select", id="filter-os"
                     )
                 with Container():
                     with Center():
-                        yield Static("Category", classes="welcome")
+                        yield Static("Category", classes="static-text")
                     yield SelectionList(
                         *self.category_types,
                         classes="filter-select",
@@ -155,7 +165,7 @@ class FilterScreen(ModalScreen):
                     )
                 with Container():
                     with Center():
-                        yield Static("Area of Interest", classes="welcome")
+                        yield Static("Area of Interest", classes="static-text")
                     yield SelectionList(
                         *self.area_types,
                         classes="filter-select",
@@ -163,7 +173,7 @@ class FilterScreen(ModalScreen):
                     )
                 with Container():
                     with Center():
-                        yield Static("Vulnerabilities", classes="welcome")
+                        yield Static("Vulnerabilities", classes="static-text")
                     yield SelectionList(
                         *self.vulnerability_types,
                         classes="filter-select",
@@ -219,12 +229,11 @@ class HTBPanel(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("f", "flag", "Flag"),
-        ("ctrl+r", "reset", "Reset"),
-        ("ctrl+s", "stop", "Stop"),
         ("s", "search", "Search"),
         ("r", "reload", "Reload"),
-        ("1", "active", "ActiveTab"),
-        ("2", "machines", "MachinesTab"),
+        ("1", "active", "Active"),
+        ("2", "machines", "Machines"),
+        ("3", "vpns", "VPN"),
         ("ctrl+f", "filters", "Filters"),
         ("Esc", "escape", "Exit field"),
         ("Enter", "submit", "Submit"),
@@ -247,20 +256,20 @@ class HTBPanel(App):
 
     def compose(self):
         with TabbedContent(classes="border", id="tab-container"):
-            with TabPane("Active machine", id="pane-active", classes="border"):
+            with TabPane("Active", id="pane-active", classes="border"):
                 with Center():
                     yield Static(
                         f"Welcome, {self.info['user']['name']}!",
-                        classes="border welcome",
+                        classes="border static-text",
                     )
                 with Container(classes="border info-machine"):
-                    yield BoxLabel("Name")
-                    yield BoxLabel(
+                    yield Label("Name")
+                    yield Label(
                         "IP",
                         "Copy",
                     )
-                    yield BoxLabel("OS")
-                    yield BoxLabel("Difficulty")
+                    yield Label("OS")
+                    yield Label("Difficulty")
                 with Container(classes="border info-flags-container"):
                     with Container(classes="flags-container"):
                         yield Static("Flags:")
@@ -268,9 +277,9 @@ class HTBPanel(App):
                         yield FlagStatus("root")
                     yield FlagInput("flag")
                 with Container(classes="border machine-buttons-container"):
-                    yield BoxAction("start")
-                    yield BoxAction("stop")
-                    yield BoxAction("reset")
+                    yield ButtonAction("start")
+                    yield ButtonAction("stop")
+                    yield ButtonAction("reset")
                     yield Select(
                         self.machine_types,
                         value=self.machine_types[0][1]
@@ -280,15 +289,8 @@ class HTBPanel(App):
                         id="machine",
                         allow_blank=False,
                     )
-                    # yield Select(
-                    #     self.vpn_types,
-                    #     value=self.info["current_vpn"]["id"],
-                    #     id="vpn",
-                    #     allow_blank=False,
-                    # )
-                    # yield BoxAction("download")
             with TabPane(
-                "Machine list", id="pane-machines", classes="border-no-bottom"
+                "Machines", id="pane-machines", classes="border-no-bottom"
             ):
                 with Container(classes="border-no-top search-container"):
                     yield Input(placeholder="Search", id="search")
@@ -297,12 +299,31 @@ class HTBPanel(App):
                     )
                 with Container():
                     yield DataTable()
+            with TabPane("VPN", id="pane-vpns", classes="border-no-bottom"):
+                with Container(classes="border-no-top"):
+                    with Container(classes="vpn-container"):
+                        with Container(classes="border info-vpn"):
+                            yield Label("Name", vpn=True)
+                            yield Label("IP", "Copy", vpn=True)
+                            yield Label("Address", "Copy", vpn=True)
+
+                        with Horizontal():
+                            yield Select(
+                                self.vpn_types,
+                                value=self.vpn_types[0][1]
+                                if not ACTIVE_VPN
+                                else ACTIVE_VPN["id"],
+                                id="vpn",
+                                allow_blank=False,
+                            )
+                            yield ButtonAction("switch")
+                            # yield ButtonAction("download")
         yield Footer()
 
     def on_mount(self):
         table = self.query_one(DataTable)
         table.cursor_type = "row"
-        table.add_columns("Machine", "Difficulty", "OS", "Free", "Tags")
+        table.add_columns("Name", "Difficulty", "OS", "Free", "Own", "Tags")
         table.add_rows(self.db.machines_with_tags())
         filter_screen = FilterScreen()
         filter_screen.status_types = (
@@ -333,16 +354,27 @@ class HTBPanel(App):
             self.push_screen("filters", self.on_filters_accept)
         elif event.button.id in ["start", "stop", "reset"]:
             machine_select = self.query_one("#machine")
-            res = await api.machine_action(
+            ok, message = await api.machine_action(
                 self.client, event.button.id, machine_select.value
             )
-            if res["success"]:
-                self.notify(res["message"])
+            if ok:
+                self.notify(message)
                 await self.action_reload()
             else:
-                self.notify(res["message"], severity="error")
+                self.notify(message, severity="error")
+        elif event.button.id in ["switch", "download"]:
+            vpn_select = self.query_one("#vpn")
+            switched = await api.switch_vpn(
+                self.client, self.info, vpn_select.value
+            )
+            filename = await api.download_vpn(
+                self.client, self.info, vpn_select.value
+            )
+            self.notify(f"Stored file as {filename}")
+            if switched:
+                await self.action_reload()
 
-    def check_action(self, action, _) -> bool:
+    def check_action(self, action, _):
         if isinstance(self.app.focused, FlagInput) or isinstance(
             self.app.focused, Input
         ):
@@ -353,8 +385,17 @@ class HTBPanel(App):
                 if action in ["escape", "submit", "active", "filters"]:
                     return False
                 return True
-            else:
-                if action in ["escape", "submit", "machines", "stop", "reset"]:
+            elif self.tab == "pane-machines":
+                if action in ["escape", "submit", "machines"]:
+                    return False
+                return True
+            elif self.tab == "pane-vpns":
+                if action in [
+                    "escape",
+                    "submit",
+                    "vpns",
+                    "filters",
+                ]:
                     return False
                 return True
         return False
@@ -378,6 +419,11 @@ class HTBPanel(App):
         self.tab = "pane-active"
         self.set_focus(self.query_one(ContentTabs))
 
+    def action_vpns(self):
+        self.query_one("#tab-container").active = "pane-vpns"
+        self.tab = "pane-vpns"
+        self.set_focus(self.query_one(ContentTabs))
+
     def action_show_tab(self, tab):
         self.query_one("#tab-container").active = tab
         self.tab = tab
@@ -386,7 +432,7 @@ class HTBPanel(App):
         self.tab = event.tabbed_content.active
 
     def on_click(self, event):
-        if event.widget.id == "ip":
+        if event.widget.id in ["ip", "ip_vpn", "address_vpn"]:
             if not subprocess.call(
                 ["which", "xclip"], stdout=subprocess.DEVNULL
             ):
@@ -405,9 +451,12 @@ class HTBPanel(App):
                 self.notify(data["message"], severity="error")
             else:
                 self.notify(data["message"])
-                self.db.machine_own(data["own_type"])
+                self.db.machine_own(
+                    machine_select.value, data["own_type"].lower()
+                )
                 flag_btn = self.query_one(f"#{data['own_type']}")
                 flag_btn.toggle()
+                event.input.clear()
 
     async def on_input_changed(self, event):
         if event.input.id == "search":
@@ -437,60 +486,83 @@ class HTBPanel(App):
 
     def update_active(self):
         active = self.info["current_box"] is not None
+        active_vpn = "ip" in self.info["current_vpn"]
         if active:
             ACTIVE.update(self.info["current_box"])
         else:
             ACTIVE.clear()
-        if self.mounted and active:
-            # Show stop
-            stop_btn = self.query_one("#stop")
-            stop_btn.remove_class("invisible")
-            # Hide start
-            start_btn = self.query_one("#start")
-            start_btn.add_class("invisible")
-            # Update reset disabled status
-            reset_btn = self.query_one("#reset")
-            reset_btn.disabled = False
-            # Update user/root flag status and color
-            for flag_type in ["user", "root"]:
-                flag_btn = self.query_one(f"#{flag_type}")
-                flag_btn.remove_class("unknown-container-button")
-                flag_btn.value = flag_btn.update_icon(flag_type)
-            # Enable flag input
-            flag_in = self.query_one("#flag")
-            flag_in.disabled = False
-            # Update box information
-            for box_type in ["name", "ip", "os", "difficulty"]:
-                box_label = self.query_one(f"#{box_type}")
-                box_label.remove_class("unknown-container")
-                box_label.update(ACTIVE[box_type])
-            # Set machine select to current box and disable
-            machine_sel = self.query_one("#machine")
-            machine_sel.value = ACTIVE["id"]
-            machine_sel.disabled = True
-        elif self.mounted and not active:
-            # Hide stop
-            stop_btn = self.query_one("#stop")
-            stop_btn.add_class("invisible")
-            # Show start
-            start_btn = self.query_one("#start")
-            start_btn.remove_class("invisible")
-            # Update reset disabled status
-            reset_btn = self.query_one("#reset")
-            reset_btn.disabled = True
-            # Update user/root flag status and color
-            for flag_type in ["user", "root"]:
-                flag_btn = self.query_one(f"#{flag_type}")
-                flag_btn.add_class("unknown-container-button")
-                flag_btn.value = flag_btn.update_icon(flag_type)
-            # Disable flag input
-            flag_in = self.query_one("#flag")
-            flag_in.disabled = True
-            # Remove box information
-            for box_type in ["name", "ip", "os", "difficulty"]:
-                box_label = self.query_one(f"#{box_type}")
-                box_label.add_class("unknown-container")
-                box_label.update("?")
-            # Eanble machine select
-            machine_sel = self.query_one("#machine")
-            machine_sel.disabled = False
+        ACTIVE_VPN.clear()
+        ACTIVE_VPN.update(self.info["current_vpn"])
+        if self.mounted:
+            if active:
+                # Show stop
+                stop_btn = self.query_one("#stop")
+                stop_btn.remove_class("invisible")
+                # Hide start
+                start_btn = self.query_one("#start")
+                start_btn.add_class("invisible")
+                # Update reset disabled status
+                reset_btn = self.query_one("#reset")
+                reset_btn.disabled = False
+                # Update user/root flag status and color
+                for flag_type in ["user", "root"]:
+                    flag_btn = self.query_one(f"#{flag_type}")
+                    flag_btn.remove_class("unknown-container-button")
+                    flag_btn.value = flag_btn.update_icon(flag_type)
+                # Enable flag input
+                flag_in = self.query_one("#flag")
+                flag_in.disabled = False
+                # Update box information
+                for box_type in ["name", "ip", "os", "difficulty"]:
+                    box_label = self.query_one(f"#{box_type}")
+                    box_label.remove_class("unknown-container")
+                    box_label.update(ACTIVE[box_type])
+                # Set machine select to current box and disable
+                machine_sel = self.query_one("#machine")
+                machine_sel.value = ACTIVE["id"]
+                machine_sel.disabled = True
+            else:
+                # Hide stop
+                stop_btn = self.query_one("#stop")
+                stop_btn.add_class("invisible")
+                # Show start
+                start_btn = self.query_one("#start")
+                start_btn.remove_class("invisible")
+                # Update reset disabled status
+                reset_btn = self.query_one("#reset")
+                reset_btn.disabled = True
+                # Update user/root flag status and color
+                for flag_type in ["user", "root"]:
+                    flag_btn = self.query_one(f"#{flag_type}")
+                    flag_btn.add_class("unknown-container-button")
+                    flag_btn.value = flag_btn.update_icon(flag_type)
+                # Disable flag input
+                flag_in = self.query_one("#flag")
+                flag_in.disabled = True
+                # Remove box information
+                for box_type in ["name", "ip", "os", "difficulty"]:
+                    box_label = self.query_one(f"#{box_type}")
+                    box_label.add_class("unknown-container")
+                    box_label.update("?")
+                # Eanble machine select
+                machine_sel = self.query_one("#machine")
+                machine_sel.disabled = False
+            if active_vpn:
+                # Update vpn information
+                for vpn_type in ["ip", "address"]:
+                    vpn_label = self.query_one(f"#{vpn_type}_vpn")
+                    vpn_label.remove_class("unknown-container")
+                    if vpn_type in ACTIVE_VPN:
+                        vpn_label.update(ACTIVE_VPN[vpn_type])
+                # Set vpn select to current vpn
+                vpn_sel = self.query_one("#vpn")
+                vpn_sel.value = ACTIVE_VPN["id"]
+            else:
+                # Remove box information
+                for vpn_type in ["ip", "address"]:
+                    vpn_label = self.query_one(f"#{vpn_type}_vpn")
+                    vpn_label.add_class("unknown-container")
+                    vpn_label.update("?")
+            # Update vpn information in any case
+            vpn_name = self.query_one("#name_vpn")
+            vpn_name.update(ACTIVE_VPN["name"])

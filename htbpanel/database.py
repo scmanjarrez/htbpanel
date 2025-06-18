@@ -44,10 +44,15 @@ class Database:
             """
         )
 
+    def _int2ico(self, value1, value2=None):
+        if value2 is not None:
+            return f"{self._int2ico(value1)}/{self._int2ico(value2)}"
+        return "✓" if value1 else "x"
+
     def machines_with_tags(self):
         self.cursor.execute(
             "SELECT machines.name, machines.difficulty, "
-            "machines.os, machines.free, "
+            "machines.os, machines.free, machines.user_own, machines.root_own, "
             "GROUP_CONCAT(tags.name, ',') AS tags "
             "FROM machines "
             "LEFT JOIN machine_tag ON machines.id = machine_tag.machine_id "
@@ -56,8 +61,8 @@ class Database:
             "ORDER BY machines.free DESC, machines.name"
         )
         return [
-            (n, d, o, "✓" if f else "x", t)
-            for (n, d, o, f, t) in self.cursor.fetchall()
+            (n, d, o, self._int2ico(f), self._int2ico(u, r), t)
+            for (n, d, o, f, u, r, t) in self.cursor.fetchall()
         ]
 
     def machine_count(self):
@@ -93,7 +98,7 @@ class Database:
 
     def machine_own(self, id, own_type):
         self.cursor.execute(
-            f"UPDATE machines SET {own_type} = 1 WHERE id = ?",
+            f"UPDATE machines SET {own_type}_own = 1 WHERE id = ?",
             [id],
         )
         self.conn.commit()
@@ -178,7 +183,7 @@ class Database:
             params.extend(tags_params)
         self.cursor.execute(
             f"SELECT machines.name, machines.difficulty, "
-            f"machines.os, machines.free, "
+            f"machines.os, machines.free, machines.user_own, machines.root_own, "
             f"GROUP_CONCAT(tags.name, ',') AS tags "
             f"FROM machines "
             f"LEFT JOIN machine_tag ON machines.id = machine_tag.machine_id "
@@ -189,8 +194,8 @@ class Database:
             params,
         )
         return [
-            (n, d, o, "✓" if f else "x", t)
-            for (n, d, o, f, t) in self.cursor.fetchall()
+            (n, d, o, self._int2ico(f), self._int2ico(u, r), t)
+            for (n, d, o, f, u, r, t) in self.cursor.fetchall()
         ]
 
     def machines_by_notag(self):
@@ -207,7 +212,7 @@ class Database:
     def machines_by_name(self, name):
         self.cursor.execute(
             "SELECT machines.name, machines.difficulty, "
-            "machines.os, machines.free, "
+            "machines.os, machines.free, machines.user_own, machines.root_own, "
             "GROUP_CONCAT(tags.name, ',') AS tags "
             "FROM machines "
             "LEFT JOIN machine_tag ON machines.id = machine_tag.machine_id "
@@ -218,8 +223,8 @@ class Database:
             [f"%{name}%"],
         )
         return [
-            (n, d, o, "✓" if f else "x", t)
-            for (n, d, o, f, t) in self.cursor.fetchall()
+            (n, d, o, self._int2ico(f), self._int2ico(u, r), t)
+            for (n, d, o, f, u, r, t) in self.cursor.fetchall()
         ]
 
     def vpn_list(self):

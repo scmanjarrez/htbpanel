@@ -28,7 +28,7 @@ Footer {
     border-bottom: none;
 }
 
-.welcome {
+.static-text {
     width: auto;
     border-top: none;
     border-bottom: none;
@@ -40,7 +40,7 @@ Footer {
     align: center middle;
 }
 
-BoxLabel {
+Label {
     border: tall $secondary;
     content-align: center middle;
     opacity: 100%;
@@ -101,11 +101,6 @@ FlagStatus {
     margin: 0 1;
 }
 
-.download {
-    width: 6;
-    min-width: 0;
-}
-
 .disabled {
     opacity: 0.6;
 }
@@ -146,4 +141,21 @@ FlagStatus {
 .filter-select {
     height: 100%;
     margin-bottom: 1;
+}
+
+.vpn-container {
+    layout: grid;
+    grid-size: 1 6;
+    border: none;
+}
+
+.info-vpn {
+    layout: grid;
+    row-span: 5;
+    align: center middle;
+}
+
+.vpn-action {
+    width: 6;
+    min-width: 0;
 }
