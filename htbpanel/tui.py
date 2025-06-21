@@ -455,7 +455,9 @@ class HTBPanel(App):
                     machine_select.value, data["own_type"].lower()
                 )
                 flag_btn = self.query_one(f"#{data['own_type']}")
-                flag_btn.toggle()
+                ACTIVE[f"{data['own_type']}_own"] = True
+                flag_btn.value = flag_btn.update_icon(data["own_type"])
+                flag_btn.refresh()
                 event.input.clear()
 
     async def on_input_changed(self, event):
@@ -509,6 +511,7 @@ class HTBPanel(App):
                     flag_btn = self.query_one(f"#{flag_type}")
                     flag_btn.remove_class("unknown-container-button")
                     flag_btn.value = flag_btn.update_icon(flag_type)
+                    flag_btn.refresh()
                 # Enable flag input
                 flag_in = self.query_one("#flag")
                 flag_in.disabled = False
@@ -536,6 +539,7 @@ class HTBPanel(App):
                     flag_btn = self.query_one(f"#{flag_type}")
                     flag_btn.add_class("unknown-container-button")
                     flag_btn.value = flag_btn.update_icon(flag_type)
+                    flag_btn.refresh()
                 # Disable flag input
                 flag_in = self.query_one("#flag")
                 flag_in.disabled = True
