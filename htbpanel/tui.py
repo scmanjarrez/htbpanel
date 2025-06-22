@@ -450,13 +450,14 @@ class HTBPanel(App):
             if "Incorrect" in data["message"]:
                 self.notify(data["message"], severity="error")
             else:
+                own_type = data["own_type"].lower()
                 self.notify(data["message"])
                 self.db.machine_own(
-                    machine_select.value, data["own_type"].lower()
+                    machine_select.value, own_type
                 )
-                flag_btn = self.query_one(f"#{data['own_type']}")
-                ACTIVE[f"{data['own_type']}_own"] = True
-                flag_btn.value = flag_btn.update_icon(data["own_type"])
+                flag_btn = self.query_one(f"#{own_type}")
+                ACTIVE[f"{own_type}_own"] = True
+                flag_btn.value = flag_btn.update_icon(own_type)
                 flag_btn.refresh()
                 event.input.clear()
 
