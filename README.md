@@ -18,8 +18,6 @@ HTBPanel supports a set of core functionalities that cover most day-to-day HTB t
 ### 🔜 Coming Soon
 Planned enhancements include:
 
-- 📡 VPN connection status and info
-- 🔄 Switch VPNs and download config file
 - 🔄 Force machine/tag update within the app
 
 ---
@@ -68,3 +66,6 @@ Have an idea or improvement? Feel free to open issues or submit pull requests! T
 
 ### 🧩 Filters Screen
 <img src="images/filters_screen.png" width="65%">
+
+### 📡 VPN Tab
+<img src="images/vpn_tab.png" width="65%">
